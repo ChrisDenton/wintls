@@ -50,6 +50,7 @@ pub unsafe fn static_ptr<T>(key: u32) -> *mut T {
 		index = in(reg) index,
 		key = in(reg) key,
 		multiplier = const INDEX_MULTIPLIER,
+		options(pure, readonly, preserves_flags, nostack),
 	);
 	ptr
 }
