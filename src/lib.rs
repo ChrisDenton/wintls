@@ -61,8 +61,12 @@ pub mod raw;
 /// See [`StaticThreadLocal`] for more information.
 #[macro_export]
 macro_rules! static_thread_local {
-	(static $name:ident: $ty:ty = $value:expr;) => {
-		static $name: $crate::StaticThreadLocal<$ty> = {
+	($vis:vis static $name:ident: $ty:ty = $value:expr;) => {
+		$vis static $name: $crate::StaticThreadLocal<$ty> = {
+			if ::core::mem::needs_drop::<$ty>() {
+				panic!("static thread locals cannot be dropped");
+			};
+
 			$crate::init_static!(static $name: $ty = $value;);
 			unsafe {
 				$crate::StaticThreadLocal {

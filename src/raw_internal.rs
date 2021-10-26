@@ -8,12 +8,12 @@
 /// ```
 #[macro_export]
 macro_rules! init_static {
-	(static $name:ident: $ty:ty = $value:expr;) => {
+	($vis:vis static $name:ident: $ty:ty = $value:expr;) => {
 		// This doesn't need to be `Cell` or anything. The trick is that we
 		// don't ever touch this memory. Instead thread-local copies are used.
 		#[link_section = ".tls$"]
 		#[used]
-		static $name: $ty = $value;
+		$vis static $name: $ty = $value;
 	};
 }
 
@@ -40,10 +40,18 @@ macro_rules! init_static {
 /// ```
 #[inline(always)]
 pub unsafe fn static_ptr<T>(key: u32) -> *mut T {
-	tls_array()
-		.add(_tls_index as usize * 8)
-		.add(key as usize)
-		.cast()
+	let mut ptr: *mut T = tls_array().cast();
+	let key = key as usize;
+	let index = _tls_index as usize;
+	asm!(
+		"mov {ptr}, [{ptr} + {index} * {multiplier}]",
+		"lea {ptr}, [{key} + {ptr}]",
+		ptr = inout(reg) ptr,
+		index = in(reg) index,
+		key = in(reg) key,
+		multiplier = const INDEX_MULTIPLIER,
+	);
+	ptr
 }
 
 /// Sets a static thread-local value.
@@ -175,7 +183,7 @@ macro_rules! static_key {
 /// 
 /// Note also that the memory may be deallocated or reused when the thread exits.
 #[inline(always)]
-pub fn tls_array() -> *mut u8 {
+pub fn tls_array() -> *mut *mut u8 {
 	tls_array_()
 }
 
@@ -184,7 +192,7 @@ pub fn tls_array() -> *mut u8 {
 
 #[cfg(target_arch="x86_64")]
 #[inline(always)]
-fn tls_array_() -> *mut u8 {
+pub fn tls_array_() -> *mut *mut u8 {
 	unsafe {
 		let tls_array: *mut *mut u8;
 		asm!(
@@ -192,12 +200,12 @@ fn tls_array_() -> *mut u8 {
 			out(reg) tls_array,
 			options(pure, readonly, preserves_flags, nostack),
 		);
-		*tls_array
+		tls_array
 	}
 }
 #[cfg(target_arch="x86")]
 #[inline(always)]
-fn tls_array_() -> *mut u8 {
+fn tls_array_() -> *mut *mut u8 {
 	unsafe {
 		let tls_array: *mut *mut u8;
 		asm!(
@@ -205,9 +213,13 @@ fn tls_array_() -> *mut u8 {
 			out(reg) tls_array,
 			options(pure, readonly, preserves_flags, nostack),
 		);
-		*tls_array
+		tls_array
 	}
 }
+#[cfg(target_arch="x86")]
+const INDEX_MULTIPLIER: usize = 4;
+#[cfg(target_arch="x86_64")]
+const INDEX_MULTIPLIER: usize = 8;
 
 extern "C" {
 	/// The offset (divided by 8) into the static thread local array where this module's locals begin.
@@ -220,3 +232,7 @@ pub use crate::init_static;
 pub use crate::static_key;
 #[doc(inline)]
 pub use crate::static_ptr;
+#[doc(inline)]
+pub use crate::get_static;
+#[doc(inline)]
+pub use crate::set_static;
