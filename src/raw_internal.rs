@@ -9,6 +9,8 @@
 #[macro_export]
 macro_rules! init_static {
 	(static $name:ident: $ty:ty = $value:expr;) => {
+		// This doesn't need to be `Cell` or anything. The trick is that we
+		// don't ever touch this memory. Instead thread-local copies are used.
 		#[link_section = ".tls$"]
 		#[used]
 		static $name: $ty = $value;
