@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["wintls"] = [{"text":"impl&lt;T&gt; Freeze for <a class=\"struct\" href=\"wintls/struct.StaticThreadLocal.html\" title=\"struct wintls::StaticThreadLocal\">StaticThreadLocal</a>&lt;T&gt;","synthetic":true,"types":["wintls::StaticThreadLocal"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
