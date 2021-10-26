@@ -2,6 +2,10 @@
 name = "wintls"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/ChrisDenton/wintls/"
+documentation = "https://chrisdenton.github.io/wintls/wintls/index.html"
+license = "MIT OR Apache-2.0"
+
 
 [dependencies]
 
