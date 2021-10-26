@@ -40,9 +40,14 @@ macro_rules! init_static {
 /// ```
 #[inline(always)]
 pub unsafe fn static_ptr<T>(key: u32) -> *mut T {
+	static_ptr_from_module(_tls_index, key)
+}
+
+#[inline(always)]
+pub unsafe fn static_ptr_from_module<T>(module: u32, key: u32) -> *mut T {
 	let mut ptr: *mut T = tls_array().cast();
 	let key = key as usize;
-	let index = _tls_index as usize;
+	let index = module as usize;
 	asm!(
 		"mov {ptr}, [{ptr} + {index} * {multiplier}]",
 		"lea {ptr}, [{key} + {ptr}]",
@@ -98,6 +103,11 @@ pub unsafe fn set_static<T>(key: u32, value: T) {
 #[inline(always)]
 pub unsafe fn get_static<T: Copy>(key: u32) -> T {
 	*static_ptr(key)
+}
+
+#[inline(always)]
+pub unsafe fn get_static_from_module<T: Copy>(module: u32, key: u32) -> T {
+	*static_ptr_from_module(module, key)
 }
 
 /// Convenience macro for setting the static thread-local value by its
