@@ -1,17 +1,17 @@
 #![feature(asm)]
+#![feature(thread_local)]
 
-wintls::raw::init_static!(
-	static TEST: u32 = 0xfeedface;
-);
+#[thread_local]
+static TEST: u32 = 0xfeedface;
 
 #[inline(always)]
 pub fn inline_the_value() -> u32 {
-	unsafe { wintls::raw::get_static!(TEST) }
+	TEST
 }
 
 #[inline(never)]
 pub fn get_the_value() -> u32 {
-	unsafe { wintls::raw::get_static!(TEST) }
+	TEST
 }
 
 // Use a module handle to get the right thread-local.
