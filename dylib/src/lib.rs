@@ -17,10 +17,7 @@ pub fn get_the_value() -> u32 {
 // Use a module handle to get the right thread-local.
 // This works because statics themselves aren't inlined.
 static MODULE_STATIC_DATA: (&u32, fn() -> u32) = {
-	wintls::raw::init_static!(
-		static DATA: u32 = 0xfeedface;
-	);
-	unsafe { (&wintls::raw::_tls_index, || wintls::raw::static_key!(DATA)) }
+	unsafe { (&wintls::raw::_tls_index, || wintls::raw::static_key!(TEST)) }
 };
 #[inline(always)]
 pub fn get_module_value() -> u32 {
