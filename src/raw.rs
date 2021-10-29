@@ -1,7 +1,7 @@
 //! Low level primitives for building static thread-local abstractions.
-//! 
+//!
 //! # Example
-//! 
+//!
 //! ```
 //! #![feature(asm)]
 //! wintls::raw::init_static!(

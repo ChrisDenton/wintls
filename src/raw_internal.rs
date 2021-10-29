@@ -1,11 +1,29 @@
+// FIXME: Currently all access to the thread-local is implemented in terms of
+// getting a pointer to the thread local. This could (and probably should) be
+// optimized to read directly into a register if the data fits.
+
+// A very unsafe type that allows putting !Send and !Sync types in a static.
+// This is just used for static initialization. When accessing a thread-local,
+// the actual type is used.
+#[doc(hidden)]
+#[repr(transparent)]
+pub struct Wrapper<T>(pub T);
+unsafe impl<T> Sync for Wrapper<T> {}
+unsafe impl<T> Send for Wrapper<T> {}
+
 /// Initialize a `static` as a thread-local.
-/// 
+///
 /// # Example
 /// ```
 /// wintls::raw::init_static!(
 ///     static DATA: u32 = 0xfeedface;
 /// );
 /// ```
+///
+/// # Safety
+///
+/// This is very unsafe. The resulting static should never be accessed at all,
+/// except to use the identifier with the other macros in this crate.
 #[macro_export]
 macro_rules! init_static {
 	($vis:vis static $name:ident: $ty:ty = $value:expr;) => {
@@ -13,21 +31,21 @@ macro_rules! init_static {
 		// don't ever touch this memory. Instead thread-local copies are used.
 		#[link_section = ".tls$"]
 		#[used]
-		$vis static $name: $ty = $value;
+		$vis static $name: $crate::raw_internal::Wrapper<$ty> = $crate::raw_internal::Wrapper($value);
 	};
 }
 
 /// Returns a mutable pointer to a tls value.
-/// 
+///
 /// Generally it should not be stored as this pointer may point to old data when
 /// a library is loaded that causes the [`tls_array`] to be reallocated.
-/// 
+///
 /// # Safety
 /// * The key must be a valid key returned by [`static_key`]
 /// * The type should be the same as when it was created.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// #![feature(asm)]
 /// wintls::raw::init_static!(
@@ -61,13 +79,13 @@ pub unsafe fn static_ptr_from_module<T>(module: u32, key: u32) -> *mut T {
 }
 
 /// Sets a static thread-local value.
-/// 
+///
 /// # Safety
 /// * The key must be a valid key returned by [`static_key`]
 /// * The type should be the same as when it was created.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// #![feature(asm)]
 /// wintls::raw::init_static!(
@@ -84,12 +102,12 @@ pub unsafe fn set_static<T>(key: u32, value: T) {
 }
 
 /// Returns the value of a static thread-local.
-/// 
+///
 /// # Safety
 /// The key must be a valid key returned by [`static_key`]
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// #![feature(asm)]
 /// wintls::raw::init_static!(
@@ -131,21 +149,21 @@ macro_rules! get_static {
 /// identifier.
 #[macro_export]
 macro_rules! static_ptr {
-    ($name:ident) => {
-        $crate::static_ptr($crate::static_key!($name))
-    };
+	($name:ident) => {
+		$crate::raw_internal::static_ptr($crate::static_key!($name))
+	};
 }
 
 /// Returns a key that identifies the thread local.
-/// 
+///
 /// # Safety
 /// Must only be used with static thread locals.
-/// 
+///
 /// Normal pointer safety rules apply. The memory may be deallocated or reused
 /// when the thread exits.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// #![feature(asm)]
 /// wintls::raw::init_static!(
@@ -177,21 +195,21 @@ macro_rules! static_key {
 }
 
 /// Returns a pointer to thread-local memory for the current thread.
-/// 
+///
 /// Calling this twice on the same thread usually returns the same value.
 /// However, if a new library is loaded and if that library uses static thread
 /// locals, it may cause a new TLS array to be allocated for each thread.
-/// 
+///
 /// Despite this, a pointer returned here will never be freed as long as the
 /// thread is still running.
-/// 
+///
 /// # Safety
-/// 
+///
 /// This is particularly unsafe to use because:
 /// * it does not return the size of the array.
 /// * it gives access to all the thread's locals regardless of the module they
 ///   were loaded in.
-/// 
+///
 /// Note also that the memory may be deallocated or reused when the thread exits.
 #[inline(always)]
 pub fn tls_array() -> *mut *mut u8 {
@@ -201,9 +219,9 @@ pub fn tls_array() -> *mut *mut u8 {
 // TODO: aarch64
 // x18 + 0x58
 
-#[cfg(target_arch="x86_64")]
+#[cfg(target_arch = "x86_64")]
 #[inline(always)]
-pub fn tls_array_() -> *mut *mut u8 {
+fn tls_array_() -> *mut *mut u8 {
 	unsafe {
 		let tls_array: *mut *mut u8;
 		asm!(
@@ -214,7 +232,7 @@ pub fn tls_array_() -> *mut *mut u8 {
 		tls_array
 	}
 }
-#[cfg(target_arch="x86")]
+#[cfg(target_arch = "x86")]
 #[inline(always)]
 fn tls_array_() -> *mut *mut u8 {
 	unsafe {
@@ -227,9 +245,9 @@ fn tls_array_() -> *mut *mut u8 {
 		tls_array
 	}
 }
-#[cfg(target_arch="x86")]
+#[cfg(target_arch = "x86")]
 const INDEX_MULTIPLIER: usize = 4;
-#[cfg(target_arch="x86_64")]
+#[cfg(target_arch = "x86_64")]
 const INDEX_MULTIPLIER: usize = 8;
 
 extern "C" {
@@ -238,12 +256,12 @@ extern "C" {
 }
 
 #[doc(inline)]
+pub use crate::get_static;
+#[doc(inline)]
 pub use crate::init_static;
+#[doc(inline)]
+pub use crate::set_static;
 #[doc(inline)]
 pub use crate::static_key;
 #[doc(inline)]
 pub use crate::static_ptr;
-#[doc(inline)]
-pub use crate::get_static;
-#[doc(inline)]
-pub use crate::set_static;

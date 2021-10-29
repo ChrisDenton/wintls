@@ -1,6 +1,6 @@
 #![feature(asm)]
 
-use wintls::raw::{init_static, static_key, static_ptr, get_static, set_static};
+use wintls::raw::{get_static, init_static, set_static, static_key, static_ptr};
 
 init_static!(
 	static TEST: u32 = 0xfeedface;
@@ -15,24 +15,24 @@ fn raw_get_set() {
 
 		// Get a mutable pointer to the value.
 		let value: u32 = get_static(key);
-        assert_eq!(value, 0xfeedface);
-		
+		assert_eq!(value, 0xfeedface);
+
 		// Set the value.
 		set_static::<u32>(key, 5);
 
 		// Get the value again.
 		let value: u32 = get_static(key);
-        assert_eq!(value, 5);
+		assert_eq!(value, 5);
 
 		// Spawn a thread and make sure the value has reverted to default...
 		let _ = std::thread::spawn(move || {
 			let value: u32 = get_static(key);
-            assert_eq!(value, 0xfeedface);
+			assert_eq!(value, 0xfeedface);
 		})
 		.join();
-		
+
 		// ...but the first thread's value is the same.
-        let value: u32 = get_static(key);
+		let value: u32 = get_static(key);
 		assert_eq!(value, 5);
 	}
 }
@@ -45,24 +45,24 @@ fn raw_ptr() {
 
 		// Get a mutable pointer to the value.
 		let value = static_ptr::<u32>(key);
-        assert_eq!(*value, 0xfeedface);
-		
+		assert_eq!(*value, 0xfeedface);
+
 		// Set the value.
 		*value = 5;
 
 		// Get the value again.
 		let value = static_ptr::<u32>(key);
-        assert_eq!(*value, 5);
+		assert_eq!(*value, 5);
 
 		// Spawn a thread and make sure the value has reverted to default...
 		let _ = std::thread::spawn(move || {
 			let value = static_ptr::<u32>(key);
-            assert_eq!(*value, 0xfeedface);
+			assert_eq!(*value, 0xfeedface);
 		})
 		.join();
-		
+
 		// ...but the first thread's value is the same.
-        let value = static_ptr::<u32>(key);
+		let value = static_ptr::<u32>(key);
 		assert_eq!(*value, 5);
 	}
 }

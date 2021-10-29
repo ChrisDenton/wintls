@@ -16,8 +16,8 @@ fn main() {
 
 		// Get a mutable pointer to the value.
 		let value = static_ptr::<u32>(key);
-        println!("thread 1: {:x}", *value);
-		
+		println!("thread 1: {:x}", *value);
+
 		// Set the value.
 		*value = 5;
 	}
