@@ -159,73 +159,150 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Creates static thread-locals for Windows binaries.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Note this crate is more a sketch than a finished design.</span>
-<span class="doccomment">//! </span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Essentially, this is a manual implementation of the thread_local feature.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Note this crate is a playground for my education and not intended for</span>
+<span class="doccomment">//! production use. If anything does end up being useful then I&#39;ll create a new</span>
+<span class="doccomment">//! crate with just the good parts, or else incorporate it into existing code.</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! # Use</span>
-<span class="doccomment">//! </span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! This requires a nightly compiler. You will also need to add `#![feature(asm)]`</span>
-<span class="doccomment">//! to your `main.rs` or `lib.rs` file.</span>
-<span class="doccomment">//! </span>
+<span class="doccomment">//! to your `main.rs` or `lib.rs` file if you use the TLS macros.</span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! # Example</span>
-<span class="doccomment">//! </span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! ```</span>
 <span class="doccomment">//! #![feature(asm)]</span>
-<span class="doccomment">//! </span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! wintls::static_thread_local!{</span>
 <span class="doccomment">//!     static TEST: u32 = 0xfeedface;</span>
 <span class="doccomment">//! }</span>
-<span class="doccomment">//! </span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//! fn main() {</span>
 <span class="doccomment">//!     println!(&quot;{:x}&quot;, TEST.get()); // feedface</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//!     TEST.set(5);</span>
 <span class="doccomment">//!     println!(&quot;{:x}&quot;, TEST.get()); // 5</span>
-<span class="doccomment">//! </span>
+<span class="doccomment">//!</span>
 <span class="doccomment">//!     std::thread::spawn(|| {</span>
 <span class="doccomment">//!         println!(&quot;{:x}&quot;, TEST.get()); // feedface</span>
 <span class="doccomment">//!     }).join();</span>
 <span class="doccomment">//! }</span>
 <span class="doccomment">//! ```</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! &lt;style&gt;#macros + * &gt; *:not(:last-child) { display:none } &lt;/style&gt;</span>
-
+<span class="doccomment">//!</span>
+<span class="doccomment">//! &lt;style&gt;#macros + * &gt; *:not(:is(:nth-last-child(2), :last-child)) { display:none } &lt;/style&gt;</span>
 
 <span class="comment">// TODO: aarch64 support</span>
-<span class="attribute">#![<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">windows</span>, <span class="ident">any</span>(<span class="ident">target_arch</span><span class="op">=</span><span class="string">&quot;x86_64&quot;</span>, <span class="ident">target_arch</span><span class="op">=</span><span class="string">&quot;x86&quot;</span>)))]</span>
+<span class="attribute">#![<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">windows</span>, <span class="ident">any</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>, <span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86&quot;</span>)))]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>)]</span>
 <span class="attribute">#![<span class="ident">cfg_attr</span>(<span class="ident">docsrs</span>, <span class="ident">feature</span>(<span class="ident">doc_cfg</span>))]</span>
-<span class="comment">// TEMP //</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">doc_cfg</span>)]</span>
 
 <span class="comment">// Some module jiggery pokery for the sake of macros.</span>
 <span class="comment">// TODO: move to a separate crate.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;raw&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">raw</span>;
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">raw_internal</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span><span class="op">=</span><span class="string">&quot;raw&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">raw</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">dtor</span>;
 
 <span class="doccomment">/// Statically initialize a thread local.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Note that no [`Drop`] implementations will be run.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Example</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// #![feature(asm)]</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// wintls::static_thread_local!{</span>
 <span class="doccomment">///     static DATA: u32 = 0xfeedface;</span>
 <span class="doccomment">///     static HELLO: [u8; 11] = *b&quot;Hello World&quot;;</span>
 <span class="doccomment">/// }</span>
 <span class="doccomment">/// ```</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// See [`StaticThreadLocal`] for more information.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">static_thread_local</span> {
-	(<span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>:<span class="ident">expr</span>;) =&gt; {
-		<span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::StaticThreadLocal</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span><span class="op">&gt;</span> <span class="op">=</span> {
+	(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>:<span class="ident">expr</span>;) =&gt; {
+		<span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::StaticThreadLocal</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span><span class="op">&gt;</span> <span class="op">=</span> {
+			<span class="kw">if</span> <span class="ident">::core::mem::needs_drop</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span><span class="op">&gt;</span>() {
+				<span class="macro">panic!</span>(<span class="string">&quot;static thread locals cannot be dropped&quot;</span>);
+			};
+
 			<span class="macro-nonterminal">$</span><span class="macro">crate::init_static!</span>(<span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>;);
 			<span class="kw">unsafe</span> {
 				<span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::StaticThreadLocal</span> {
@@ -243,20 +320,20 @@
 }
 
 <span class="doccomment">/// Enables setting or getting a static thread local value.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Initialization and Destruction</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// The thread local can be statically initialized using [`static_thread_local`].</span>
 <span class="doccomment">/// No [`Drop`] implementations will be run.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Example</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// #![feature(asm)]</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// wintls::static_thread_local!{</span>
 <span class="doccomment">///     static DATA: u32 = 0xfeedface;</span>
 <span class="doccomment">/// }</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// fn main() {</span>
 <span class="doccomment">///     println!(&quot;{:x}&quot;, DATA.get());</span>
 <span class="doccomment">/// }</span>
@@ -269,9 +346,9 @@
 }
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Copy</span><span class="op">&gt;</span> <span class="ident">StaticThreadLocal</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
 	<span class="doccomment">/// Returns the value of the the thread local.</span>
-	<span class="doccomment">/// </span>
+	<span class="doccomment">///</span>
 	<span class="doccomment">/// # Example</span>
-	<span class="doccomment">/// </span>
+	<span class="doccomment">///</span>
 	<span class="doccomment">/// ```</span>
 	<span class="doccomment">/// # #![feature(asm)]</span>
 	<span class="doccomment">/// # use wintls::static_thread_local;</span>
@@ -283,15 +360,15 @@
 	<span class="doccomment">/// let value = DATA.get();</span>
 	<span class="doccomment">/// # }</span>
 	<span class="doccomment">/// ```</span>
-	<span class="attribute">#[<span class="ident">inline</span>]</span>
+	<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">T</span> {
 		(<span class="self">self</span>.<span class="ident">get</span>)()
 	}
 
 	<span class="doccomment">/// Sets the value of the the thread local.</span>
-	<span class="doccomment">/// </span>
+	<span class="doccomment">///</span>
 	<span class="doccomment">/// # Example</span>
-	<span class="doccomment">/// </span>
+	<span class="doccomment">///</span>
 	<span class="doccomment">/// ```</span>
 	<span class="doccomment">/// # #![feature(asm)]</span>
 	<span class="doccomment">/// # use wintls::static_thread_local;</span>
@@ -303,10 +380,71 @@
 	<span class="doccomment">/// DATA.set(5);</span>
 	<span class="doccomment">/// # }</span>
 	<span class="doccomment">/// ```</span>
-	<span class="attribute">#[<span class="ident">inline</span>]</span>
+	<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>) {
 		(<span class="self">self</span>.<span class="ident">set</span>)(<span class="ident">value</span>)
 	}
+}
+
+<span class="doccomment">/// Grants unsafe access to the thread local.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// In general you should make sure that any references to the actual thread</span>
+<span class="doccomment">/// local are as short-lived as possible.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Stale Pointers</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// If a new DLL is lazily loaded and that DLL requires the static TLS array to</span>
+<span class="doccomment">/// be expanded then, for each thread, a new TLS array will be created without</span>
+<span class="doccomment">/// dropping the old one. The old array will then be copied to the new one.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// So now there are two copies of the thread local data. If a new pointer is</span>
+<span class="doccomment">/// made then it&#39;ll point to the new data but any old pointers will still point</span>
+<span class="doccomment">/// to the &quot;stale&quot; data.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnsafeLocal</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+	<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
+	<span class="kw">pub</span> <span class="ident">get</span>: <span class="kw">fn</span>() -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">T</span>,
+}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">UnsafeLocal</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+	<span class="doccomment">/// Getting a pointer is safe.</span>
+	<span class="doccomment">/// Using it should be mostly safe (normal caveats aside) so long as there</span>
+	<span class="doccomment">/// aren&#39;t any active references. That said, you should almost certainly use</span>
+	<span class="doccomment">/// and discard the pointer asap.</span>
+	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_ptr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">T</span> {
+		(<span class="self">self</span>.<span class="ident">get</span>)()
+	}
+	<span class="doccomment">/// There can be many shared references but there must not be a mutable</span>
+	<span class="doccomment">/// reference at all. Also no mutation should occur for the lifetime of this</span>
+	<span class="doccomment">/// reference.</span>
+	<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
+		<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">as_ptr</span>()
+	}
+	<span class="doccomment">/// There can only be one mutable reference at a time and there must not be</span>
+	<span class="doccomment">/// any shared references. Also mutation should only happen via this</span>
+	<span class="doccomment">/// reference and not through any pointer.</span>
+	<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">as_ref_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span> {
+		<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">as_ptr</span>()
+	}
+
+	<span class="doccomment">/// Drops the memory. No further use of the memory should occur after</span>
+	<span class="doccomment">/// calling this, unless a new value is created in place.</span>
+	<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">drop_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+		<span class="ident">core::ptr::drop_in_place</span>(<span class="self">self</span>.<span class="ident">as_ptr</span>());
+	}
+}
+
+<span class="doccomment">/// Create an [`UnsafeLocal`].</span>
+<span class="attribute">#[<span class="ident">macro_export</span>]</span>
+<span class="macro">macro_rules!</span> <span class="ident">unsafe_local</span> {
+	(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>:<span class="ident">expr</span>;) =&gt; {
+		<span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::UnsafeLocal</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span><span class="op">&gt;</span> <span class="op">=</span> {
+			<span class="macro-nonterminal">$</span><span class="macro">crate::init_static!</span>(
+				<span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>;
+			);
+			<span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::UnsafeLocal</span> {
+				<span class="ident">get</span>: <span class="op">|</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="macro-nonterminal">$</span><span class="macro">crate::static_ptr!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>) },
+			}
+		};
+	};
 }
 
 <span class="comment">// `_tls_used` is where the TLS directory information is stored.</span>

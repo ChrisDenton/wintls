@@ -1,1 +1,1 @@
-window.ALL_CRATES = ["wintls"];
+window.ALL_CRATES = ["dydll","libfoo","wintls"];

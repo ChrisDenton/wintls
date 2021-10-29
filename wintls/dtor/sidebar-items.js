@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["DtorState",""]],"fn":[["drop_locals","Runs the thread local drops."],["register_dtor","Register a destructor for a thread local on this thread only."],["state","Returns the current [`DtorState`]."]]});

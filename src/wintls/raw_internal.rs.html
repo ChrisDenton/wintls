@@ -218,34 +218,101 @@
 <span id="218">218</span>
 <span id="219">219</span>
 <span id="220">220</span>
-</pre><pre class="rust"><code><span class="doccomment">/// Initialize a `static` as a thread-local.</span>
-<span class="doccomment">/// </span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+</pre><pre class="rust"><code><span class="comment">// FIXME: Currently all access to the thread-local is implemented in terms of</span>
+<span class="comment">// getting a pointer to the thread local. This could (and probably should) be</span>
+<span class="comment">// optimized to read directly into a register if the data fits.</span>
+
+<span class="comment">// A very unsafe type that allows putting !Send and !Sync types in a static.</span>
+<span class="comment">// This is just used for static initialization. When accessing a thread-local,</span>
+<span class="comment">// the actual type is used.</span>
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw">pub</span> <span class="ident">T</span>);
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {}
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {}
+
+<span class="doccomment">/// Initialize a `static` as a thread-local.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Example</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// wintls::raw::init_static!(</span>
 <span class="doccomment">///     static DATA: u32 = 0xfeedface;</span>
 <span class="doccomment">/// );</span>
 <span class="doccomment">/// ```</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Safety</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is very unsafe. The resulting static should never be accessed at all,</span>
+<span class="doccomment">/// except to use the identifier with the other macros in this crate.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">init_static</span> {
-	(<span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>:<span class="ident">expr</span>;) =&gt; {
+	(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>:<span class="ident">expr</span>;) =&gt; {
+		<span class="comment">// This doesn&#39;t need to be `Cell` or anything. The trick is that we</span>
+		<span class="comment">// don&#39;t ever touch this memory. Instead thread-local copies are used.</span>
 		<span class="attribute">#[<span class="ident">link_section</span> <span class="op">=</span> <span class="string">&quot;.tls$&quot;</span>]</span>
 		<span class="attribute">#[<span class="ident">used</span>]</span>
-		<span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>;
+		<span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::raw_internal::Wrapper</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::raw_internal::Wrapper</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">value</span>);
 	};
 }
 
 <span class="doccomment">/// Returns a mutable pointer to a tls value.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Generally it should not be stored as this pointer may point to old data when</span>
 <span class="doccomment">/// a library is loaded that causes the [`tls_array`] to be reallocated.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Safety</span>
 <span class="doccomment">/// * The key must be a valid key returned by [`static_key`]</span>
 <span class="doccomment">/// * The type should be the same as when it was created.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Example</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// #![feature(asm)]</span>
 <span class="doccomment">/// wintls::raw::init_static!(</span>
@@ -258,20 +325,34 @@
 <span class="doccomment">/// ```</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">static_ptr</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">key</span>: <span class="ident">u32</span>) -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">T</span> {
-	<span class="ident">tls_array</span>()
-		.<span class="ident">add</span>(<span class="ident">_tls_index</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">*</span> <span class="number">8</span>)
-		.<span class="ident">add</span>(<span class="ident">key</span> <span class="kw">as</span> <span class="ident">usize</span>)
-		.<span class="ident">cast</span>()
+	<span class="ident">static_ptr_from_module</span>(<span class="ident">_tls_index</span>, <span class="ident">key</span>)
+}
+
+<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">static_ptr_from_module</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">module</span>: <span class="ident">u32</span>, <span class="ident">key</span>: <span class="ident">u32</span>) -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">T</span> {
+	<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ptr</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">tls_array</span>().<span class="ident">cast</span>();
+	<span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">key</span> <span class="kw">as</span> <span class="ident">usize</span>;
+	<span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">module</span> <span class="kw">as</span> <span class="ident">usize</span>;
+	<span class="macro">asm!</span>(
+		<span class="string">&quot;mov {ptr}, [{ptr} + {index} * {multiplier}]&quot;</span>,
+		<span class="string">&quot;lea {ptr}, [{key} + {ptr}]&quot;</span>,
+		<span class="ident">ptr</span> <span class="op">=</span> <span class="ident">inout</span>(<span class="ident">reg</span>) <span class="ident">ptr</span>,
+		<span class="ident">index</span> <span class="op">=</span> <span class="kw">in</span>(<span class="ident">reg</span>) <span class="ident">index</span>,
+		<span class="ident">key</span> <span class="op">=</span> <span class="kw">in</span>(<span class="ident">reg</span>) <span class="ident">key</span>,
+		<span class="ident">multiplier</span> <span class="op">=</span> <span class="kw">const</span> <span class="ident">INDEX_MULTIPLIER</span>,
+		<span class="ident">options</span>(<span class="ident">pure</span>, <span class="ident">readonly</span>, <span class="ident">preserves_flags</span>, <span class="ident">nostack</span>),
+	);
+	<span class="ident">ptr</span>
 }
 
 <span class="doccomment">/// Sets a static thread-local value.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Safety</span>
 <span class="doccomment">/// * The key must be a valid key returned by [`static_key`]</span>
 <span class="doccomment">/// * The type should be the same as when it was created.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Example</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// #![feature(asm)]</span>
 <span class="doccomment">/// wintls::raw::init_static!(</span>
@@ -288,12 +369,12 @@
 }
 
 <span class="doccomment">/// Returns the value of a static thread-local.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Safety</span>
 <span class="doccomment">/// The key must be a valid key returned by [`static_key`]</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Example</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// #![feature(asm)]</span>
 <span class="doccomment">/// wintls::raw::init_static!(</span>
@@ -307,6 +388,11 @@
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get_static</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Copy</span><span class="op">&gt;</span>(<span class="ident">key</span>: <span class="ident">u32</span>) -&gt; <span class="ident">T</span> {
 	<span class="kw-2">*</span><span class="ident">static_ptr</span>(<span class="ident">key</span>)
+}
+
+<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get_static_from_module</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Copy</span><span class="op">&gt;</span>(<span class="ident">module</span>: <span class="ident">u32</span>, <span class="ident">key</span>: <span class="ident">u32</span>) -&gt; <span class="ident">T</span> {
+	<span class="kw-2">*</span><span class="ident">static_ptr_from_module</span>(<span class="ident">module</span>, <span class="ident">key</span>)
 }
 
 <span class="doccomment">/// Convenience macro for setting the static thread-local value by its</span>
@@ -330,21 +416,21 @@
 <span class="doccomment">/// identifier.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">static_ptr</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>) =&gt; {
-        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::static_ptr</span>(<span class="macro-nonterminal">$</span><span class="macro">crate::static_key!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>))
-    };
+	(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>) =&gt; {
+		<span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::raw_internal::static_ptr</span>(<span class="macro-nonterminal">$</span><span class="macro">crate::static_key!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>))
+	};
 }
 
 <span class="doccomment">/// Returns a key that identifies the thread local.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Safety</span>
 <span class="doccomment">/// Must only be used with static thread locals.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Normal pointer safety rules apply. The memory may be deallocated or reused</span>
 <span class="doccomment">/// when the thread exits.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Example</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// #![feature(asm)]</span>
 <span class="doccomment">/// wintls::raw::init_static!(</span>
@@ -376,33 +462,33 @@
 }
 
 <span class="doccomment">/// Returns a pointer to thread-local memory for the current thread.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Calling this twice on the same thread usually returns the same value.</span>
 <span class="doccomment">/// However, if a new library is loaded and if that library uses static thread</span>
 <span class="doccomment">/// locals, it may cause a new TLS array to be allocated for each thread.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Despite this, a pointer returned here will never be freed as long as the</span>
 <span class="doccomment">/// thread is still running.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Safety</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// This is particularly unsafe to use because:</span>
 <span class="doccomment">/// * it does not return the size of the array.</span>
 <span class="doccomment">/// * it gives access to all the thread&#39;s locals regardless of the module they</span>
 <span class="doccomment">///   were loaded in.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Note also that the memory may be deallocated or reused when the thread exits.</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tls_array</span>() -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tls_array</span>() -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span> {
 	<span class="ident">tls_array_</span>()
 }
 
 <span class="comment">// TODO: aarch64</span>
 <span class="comment">// x18 + 0x58</span>
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span><span class="op">=</span><span class="string">&quot;x86_64&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">fn</span> <span class="ident">tls_array_</span>() -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span> {
+<span class="kw">fn</span> <span class="ident">tls_array_</span>() -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span> {
 	<span class="kw">unsafe</span> {
 		<span class="kw">let</span> <span class="ident">tls_array</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>;
 		<span class="macro">asm!</span>(
@@ -410,12 +496,12 @@
 			<span class="ident">out</span>(<span class="ident">reg</span>) <span class="ident">tls_array</span>,
 			<span class="ident">options</span>(<span class="ident">pure</span>, <span class="ident">readonly</span>, <span class="ident">preserves_flags</span>, <span class="ident">nostack</span>),
 		);
-		<span class="kw-2">*</span><span class="ident">tls_array</span>
+		<span class="ident">tls_array</span>
 	}
 }
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span><span class="op">=</span><span class="string">&quot;x86&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86&quot;</span>)]</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">fn</span> <span class="ident">tls_array_</span>() -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span> {
+<span class="kw">fn</span> <span class="ident">tls_array_</span>() -&gt; <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span> {
 	<span class="kw">unsafe</span> {
 		<span class="kw">let</span> <span class="ident">tls_array</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>;
 		<span class="macro">asm!</span>(
@@ -423,9 +509,13 @@
 			<span class="ident">out</span>(<span class="ident">reg</span>) <span class="ident">tls_array</span>,
 			<span class="ident">options</span>(<span class="ident">pure</span>, <span class="ident">readonly</span>, <span class="ident">preserves_flags</span>, <span class="ident">nostack</span>),
 		);
-		<span class="kw-2">*</span><span class="ident">tls_array</span>
+		<span class="ident">tls_array</span>
 	}
 }
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86&quot;</span>)]</span>
+<span class="kw">const</span> <span class="ident">INDEX_MULTIPLIER</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
+<span class="kw">const</span> <span class="ident">INDEX_MULTIPLIER</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span>;
 
 <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> {
 	<span class="doccomment">/// The offset (divided by 8) into the static thread local array where this module&#39;s locals begin.</span>
@@ -433,7 +523,11 @@
 }
 
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::get_static</span>;
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::init_static</span>;
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::set_static</span>;
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::static_key</span>;
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">inline</span>)]</span>
